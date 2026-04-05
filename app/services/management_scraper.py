@@ -1,5 +1,6 @@
-import requests
+import httpx
 from bs4 import BeautifulSoup
+import asyncio
 
 BASE_URL = "https://bstu.uz"
 
@@ -8,23 +9,27 @@ headers = {
 }
 
 
-def parse_management_page(url: str):
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
+async def fetch_page(client, url):
+    response = await client.get(url)
+    return response.text
 
-    # POSITION (lavozim)
+
+def parse_html(html, url):
+    soup = BeautifulSoup(html, "html.parser")
+
+    # POSITION
     position_tag = soup.find("h3", class_="widget-head")
     position = position_tag.text.strip() if position_tag else None
 
     # IMAGE
-    img_tag = soup.find("img")
+    img_tag = soup.select_one(".my-details img")
     image = img_tag["src"] if img_tag else None
 
     # NAME
     name_tag = soup.find("h4", class_="my-name")
     name = name_tag.text.strip() if name_tag else None
 
-    # INFO (qabul vaqti, telefon, email)
+    # INFO
     info_list = soup.select("ul.list li")
 
     reception = None
@@ -32,18 +37,16 @@ def parse_management_page(url: str):
     email = None
 
     for item in info_list:
-        text = item.text.strip().lower()
+        text = item.text.lower()
 
         if "qabul" in text:
             reception = item.text.strip()
-
         elif "telefon" in text:
             phone = item.text.strip()
-
         elif "email" in text:
             email = item.text.strip()
 
-    # BIO / VAZIFALAR
+    # BIO
     bio_tag = soup.find("div", class_="panel")
     bio = bio_tag.text.strip() if bio_tag else None
 
@@ -58,7 +61,7 @@ def parse_management_page(url: str):
         "url": url
     }
 
-def get_all_management():
+async def get_all_management_async():
     urls = [
         "https://bstu.uz/rahbariyat/rektor",
         "https://bstu.uz/rahbariyat/o-quv-ishlari-bo-yicha-birinchi-prorektor",
@@ -67,13 +70,17 @@ def get_all_management():
         "https://bstu.uz/rahbariyat/moliya-va-iqtisod-ishlari-bo-yicha-prorektor",
     ]
 
-    data = []
+    async with httpx.AsyncClient(headers=headers, timeout=20) as client:
+        tasks = [fetch_page(client, url) for url in urls]
+        pages = await asyncio.gather(*tasks)
 
-    for url in urls:
+    results = []
+
+    for html, url in zip(pages, urls):
         try:
-            person = parse_management_page(url)
-            data.append(person)
+            data = parse_html(html, url)
+            results.append(data)
         except Exception as e:
-            print("Error:", url, e)
+            print("Parse error:", url, e)
 
-    return data
+    return results
