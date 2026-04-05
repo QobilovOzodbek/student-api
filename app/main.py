@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 
 from app.api import chat, news, events, feedback, management, grants
+import sys
+import os
 
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 app = FastAPI()
 
 app.include_router(chat.router)
