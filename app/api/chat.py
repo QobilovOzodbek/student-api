@@ -6,6 +6,7 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 
 class Message(BaseModel):
     text: str
+    pass
 
 @router.post("/")
 def chat(message: Message):
